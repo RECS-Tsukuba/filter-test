@@ -122,15 +122,36 @@ int showErrorWindow(const std::string& window_name) {
 
   return EXIT_FAILURE;
 }
+/*
+ Get image file name from program options.
+ \param agrc argc
+ \param argv argv
+ \return image file name
+*/
+std::string getImageFilename(int argc, char** argv)
+  { return (argc == 2)? string("input.jpg"): string(argv[1]); }
+/*!
+ Get kernel file name from program options.
+ \param argc argc
+ \param argv argv
+ \return kernel file name
+ */
+std::string getKernelFilename(int argc, char** argv)
+  { return (argc == 2)? string(argv[1]): string(argv[2]); }
 } // namespace
 
 int main(int argc, char** argv) { 
-  if(argc == 3) {
-    Mat original = imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE);
+  if(argc == 2 || argc == 3) {
+    Mat original = imread(
+      ::getImageFilename(argc, argv), CV_LOAD_IMAGE_GRAYSCALE
+    );
 
     exit(
       (original.data != NULL)?
-        ::showImage(original, ::filter(original, ::getKernel(string(argv[2])))):
+        ::showImage(
+          original,
+          ::filter(original, ::getKernel(::getKernelFilename(argc, argv)))
+        ):
         ::showErrorWindow(string("Could not open or find the image"))
     );
   } else {
