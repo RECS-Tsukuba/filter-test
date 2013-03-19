@@ -26,7 +26,7 @@ using cv::waitKey;
 
 namespace {
 /*
- Set operators to a kernel row from a string
+ Set operators to a kernel row from a string.
  \param row a kernel row.
  \param line a string
  \param size a kernel size
@@ -37,6 +37,7 @@ void setOperator(Mat row, const string& line, uint64_t size) {
     if(line_stream.good() && !line_stream.eof()) {
       string op;
       getline(line_stream, op, ',');
+      // Set an operator parameter.
       row.at<double>(i) =  static_cast<double>(atof(op.c_str()));
     } else { break; }
   }
@@ -44,7 +45,7 @@ void setOperator(Mat row, const string& line, uint64_t size) {
 /*!
  Get a kernel matrix from a csv file.
  \param filename csv file name
- \return a kernel matrix
+ \return a kernel matrix. If had some error, return empty matrix.
 */
 cv::Mat getKernel(const std::string& filename) {
   ifstream stream;
@@ -54,35 +55,55 @@ cv::Mat getKernel(const std::string& filename) {
     string line;
     getline(stream, line);
 
+    // Get filter size.
     uint64_t size = count(line.begin(), line.end(), ',') + 1;
+    // Allocate a kernel matrix.
+    Mat kernel = Mat::zeros(size, size, cv::DataType<double>::type);
 
-    Mat kernel(size, size, cv::DataType<double>::type);
-    if(kernel.data == NULL) { return Mat::zeros(1, 1, CV_8S); }
+    if(kernel.data == NULL) {
+      return Mat();
+    } else {
+      setOperator(kernel.row(0), line, size);
 
-    setOperator(kernel.row(0), line, size);
+      for(uint64_t i = 1; i < size; ++i) {
+        if(stream.good() && !stream.eof()) {
+          getline(stream, line);
+          setOperator(kernel.row(i), line, size);
+        } else { break; }
+      }
 
-    for(uint64_t i = 1; i < size; ++i) {
-      if(stream.good() && !stream.eof()) {
-        getline(stream, line);
-        setOperator(kernel.row(i), line, size);
-      } else { break; }
+      return kernel;
     }
-
-    return kernel;
-  } else { return Mat::zeros(1, 1, CV_8S); }
+  } else { return Mat(); }
 }
 /*!
  Get a filtered matrix.
  \param src an original matrix.
  \param kernel a kernel.
- \return a fitered matrix.
+ \return a fitered matrix. If an input matrix was empty, return an empty matrix.
 */
 cv::Mat filter(const cv::Mat& src, const cv::Mat& kernel) {
-  Mat filtered;
-  src.copyTo(filtered);
+  if(src.data != NULL && kernel.data != NULL) {
+    Mat filtered;
+    src.copyTo(filtered);
 
-  filter2D(src, filtered, src.depth(), kernel, cv::Point(0, 0));
-  return filtered;
+    filter2D(src, filtered, src.depth(), kernel, cv::Point(0, 0));
+    return filtered;
+  } else { return Mat(); }
+}
+/*!
+ Show an empty window to show error messages on title.
+ When an empty window was closed, show error messages on an console.
+ \param window_name error messages
+ \return always EXIT_FAILURE
+*/
+int showErrorWindow(const std::string& error_message) {
+  namedWindow(error_message, CV_WINDOW_AUTOSIZE);
+  waitKey(0);
+
+  cerr << error_message << endl;
+
+  return EXIT_FAILURE;
 }
 /*!
  Show an original image and a filtered image on GUI.
@@ -90,11 +111,12 @@ cv::Mat filter(const cv::Mat& src, const cv::Mat& kernel) {
  \param filtered a filtered image matrix.
  \return always EXIT_SUCCESS
 */
-int showImage(const cv::Mat& original, const cv::Mat& filtered) {
+int showImageWindow(const cv::Mat& original, const cv::Mat& filtered) {
   Mat output = Mat::zeros(
     original.size().height, original.size().width * 2, original.type()
   );
 
+  // Combine an original image and a filtered image.
   original.copyTo(Mat(output, Rect(0, 0, original.cols, original.rows)));
   filtered.copyTo(
     Mat(output, Rect(original.cols, 0, original.cols, original.rows))
@@ -108,20 +130,14 @@ int showImage(const cv::Mat& original, const cv::Mat& filtered) {
 
   return EXIT_SUCCESS;
 }
-/*!
- Show an empty window to show error messages on title.
- When an empty window was closed, show error messages on an console.
- \param window_name error messages
- \return always EXIT_FAILURE
-*/
-int showErrorWindow(const std::string& window_name) {
-  namedWindow(window_name, CV_WINDOW_AUTOSIZE);
-  waitKey(0);
-
-  cerr << window_name << endl;
-
-  return EXIT_FAILURE;
+int showWindow(const cv::Mat& original, const cv::Mat& filtered) {
+  if(original.data == NULL) {
+    return showErrorWindow(string("failed to open the image."));
+  } else if(filtered.data == NULL) {
+    return showErrorWindow(string("failed to filter the image."));
+  } else { return showImageWindow(original, filtered); }
 }
+//int showImageWindow(
 /*
  Get image file name from program options.
  \param agrc argc
@@ -147,12 +163,10 @@ int main(int argc, char** argv) {
     );
 
     exit(
-      (original.data != NULL)?
-        ::showImage(
-          original,
-          ::filter(original, ::getKernel(::getKernelFilename(argc, argv)))
-        ):
-        ::showErrorWindow(string("Could not open or find the image"))
+      ::showWindow(
+        original,
+        ::filter(original, ::getKernel(::getKernelFilename(argc, argv)))
+      )
     );
   } else {
     exit(
