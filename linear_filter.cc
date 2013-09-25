@@ -38,7 +38,7 @@ ifstream& Rewind(ifstream& stream) {
   stream.seekg(0, ios::beg);
   return stream;
 }
-/*
+/*!
  \brief カーネルへオペレータをセット。
 
  \param row カーネルの行
