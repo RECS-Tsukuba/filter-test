@@ -23,7 +23,6 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
-#include <stdint.h>  // #include <cstdint>
 #include <cstdlib>
 #include <algorithm>
 #include <fstream>
@@ -49,6 +48,86 @@ using cv::Rect;
 using cv::waitKey;
 
 namespace {
+cv::Mat Filter(const cv::Mat& src, const cv::Mat& kernel);
+std::string GetImageFilename(int argc, char** argv);
+cv::Mat GetKernel(const std::string& filename);
+std::string GetKernelFilename(int argc, char** argv);
+int GetKernelSize(std::ifstream& stream);
+std::ifstream& Rewind(std::ifstream& stream);
+void SetOperator(cv::Mat row, const string& line, int size);
+cv::Mat SetOperators(cv::Mat kernel, std::ifstream& stream, int size);
+int ShowErrorWindow(const std::string& error_message);
+int ShowImageWindow(const cv::Mat& original, const cv::Mat& filtered);
+int ShowWindow(const cv::Mat& original, const cv::Mat& filtered);
+}  // namespace
+
+namespace {
+/*!
+ \brief 画像をカーネルに基づいた線形フィルタをかける。
+
+ \param src 元画像
+ \param kernel カーネル
+ \return フィルタされた画像。元画像かカーネルにエラーがある場合、空の画像
+*/
+Mat Filter(const Mat& src, const Mat& kernel) {
+  if (src.data != NULL && kernel.data != NULL) {
+    Mat filtered;
+    src.copyTo(filtered);
+
+    filter2D(src, filtered, src.depth(), kernel, cv::Point(0, 0));
+    return filtered;
+  } else { return Mat(); }
+}
+/*!
+ \brief 画像のファイル名を取得。
+
+ プログラム引数が2つの時(画像ファイル名が指定されていない)はデフォルトの値
+ 'input.jpg'を、それ以上の場合は第二引数をファイル名として返す。
+ 
+ \param agrc argc
+ \param argv argv
+ \return 画像のファイル名
+*/
+string GetImageFilename(int argc, char** argv)
+  { return (argc == 2)? string("input.jpg"): string(argv[2]); }
+/*!
+ \brief ファイルを読み込み、カーネルを取得する。
+
+ \param filename カーネルを表したCSVのファイル名
+ \return カーネル。エラーが起きた場合は空の画像
+*/
+Mat GetKernel(const string& filename) {
+  try {
+    ifstream stream(filename.c_str());
+    if (stream.good()) {
+      int size = ::GetKernelSize(stream);
+      // カーネルの領域を確保
+      Mat kernel = Mat::zeros(size, size, cv::DataType<double>::type);
+
+      return (size <= 0 || kernel.data == NULL)?
+        Mat(): SetOperators(kernel, ::Rewind(stream), size);
+    } else { return Mat(); }
+  } catch(...) { return Mat(); }
+}
+/*!
+ \brief カーネルを記述したファイル名を取得。
+
+ \param argc argc
+ \param argv argv
+ \return カーネルを記述したファイル名
+ */
+string GetKernelFilename(int argc, char** argv) { return string(argv[1]); }
+/*!
+ \brief カーネルのサイズを取得。
+
+ \param stream カーネルのファイルストリーム
+ \return カーネルのサイズ。取得に失敗した場合は0
+ */
+int GetKernelSize(ifstream& stream) {
+  string line;
+  return (getline(stream, line))?
+    count(line.begin(), line.end(), ',') + 1: 0;
+}
 /*!
  \brief ファイルストリームの走査位置を先頭へ戻す。
 
@@ -89,52 +168,6 @@ Mat SetOperators(Mat kernel, ifstream& stream, int size) {
   return kernel;
 }
 /*!
- \brief カーネルのサイズを取得。
-
- \param stream カーネルのファイルストリーム
- \return カーネルのサイズ。取得に失敗した場合は0
- */
-int GetKernelSize(ifstream& stream) {
-  string line;
-  return (getline(stream, line))?
-    count(line.begin(), line.end(), ',') + 1: 0;
-}
-/*!
- \brief ファイルを読み込み、カーネルを取得する。
-
- \param filename カーネルを表したCSVのファイル名
- \return カーネル。エラーが起きた場合は空の画像
-*/
-Mat GetKernel(const string& filename) {
-  try {
-    ifstream stream(filename.c_str());
-    if (stream.good()) {
-      int size = ::GetKernelSize(stream);
-      // カーネルの領域を確保
-      Mat kernel = Mat::zeros(size, size, cv::DataType<double>::type);
-
-      return (size <= 0 || kernel.data == NULL)?
-        Mat(): SetOperators(kernel, ::Rewind(stream), size);
-    } else { return Mat(); }
-  } catch(...) { return Mat(); }
-}
-/*!
- \brief 画像をカーネルに基づいた線形フィルタをかける。
-
- \param src 元画像
- \param kernel カーネル
- \return フィルタされた画像。元画像かカーネルにエラーがある場合、空の画像
-*/
-Mat Filter(const Mat& src, const Mat& kernel) {
-  if (src.data != NULL && kernel.data != NULL) {
-    Mat filtered;
-    src.copyTo(filtered);
-
-    filter2D(src, filtered, src.depth(), kernel, cv::Point(0, 0));
-    return filtered;
-  } else { return Mat(); }
-}
-/*!
  \brief エラーメッセージをウィンドウ名として表示。
 
  ウィンドウが閉じられた時、標準エラー出力にもエラーメッセージを出力する。
@@ -144,7 +177,7 @@ Mat Filter(const Mat& src, const Mat& kernel) {
  \param error_message エラーメッセージ
  \return 常ににEXIT_FAILURE
 */
-int ShowErrorWindow(const std::string& error_message) {
+int ShowErrorWindow(const string& error_message) {
   namedWindow(error_message, CV_WINDOW_AUTOSIZE);
   waitKey(0);
 
@@ -188,34 +221,13 @@ int ShowImageWindow(const Mat& original, const Mat& filtered) {
  \param filtered フィルタされた画像
  \param エラーコード
  */
-int ShowWindow(const cv::Mat& original, const cv::Mat& filtered) {
+int ShowWindow(const Mat& original, const Mat& filtered) {
   if (original.data == NULL) {
     return ShowErrorWindow(string("failed to open the image."));
   } else if (filtered.data == NULL) {
     return ShowErrorWindow(string("failed to filter the image."));
   } else { return ShowImageWindow(original, filtered); }
 }
-/*!
- \brief 画像のファイル名を取得。
-
- プログラム引数が2つの時(画像ファイル名が指定されていない)はデフォルトの値
- 'input.jpg'を、それ以上の場合は第二引数をファイル名として返す。
- 
- \param agrc argc
- \param argv argv
- \return 画像のファイル名
-*/
-std::string GetImageFilename(int argc, char** argv)
-  { return (argc == 2)? string("input.jpg"): string(argv[2]); }
-/*!
- \brief カーネルを記述したファイル名を取得。
-
- \param argc argc
- \param argv argv
- \return カーネルを記述したファイル名
- */
-std::string GetKernelFilename(int argc, char** argv)
-  { return string(argv[1]); }
 }  // namespace
 
 int main(int argc, char** argv) {
