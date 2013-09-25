@@ -198,18 +198,22 @@ int ShowImageWindow(const Mat& original, const Mat& filtered) {
       original.size().width * 2,
       original.type());
 
-  // 元画像とフィルタされた画像を結合
-  original.copyTo(Mat(output, Rect(0, 0, original.cols, original.rows)));
-  filtered.copyTo(
-      Mat(output, Rect(original.cols, 0, original.cols, original.rows)));
+  if (output.empty()) {
+    return ShowErrorWindow("failed to allocate an output image");
+  } else {
+    // 元画像とフィルタされた画像を結合
+    original.copyTo(Mat(output, Rect(0, 0, original.cols, original.rows)));
+    filtered.copyTo(
+        Mat(output, Rect(original.cols, 0, original.cols, original.rows)));
 
-  string window_name("linear_filter");
-  namedWindow(window_name, CV_WINDOW_AUTOSIZE);
-  imshow(window_name, output);
+    string window_name("linear_filter");
+    namedWindow(window_name, CV_WINDOW_AUTOSIZE);
+    imshow(window_name, output);
 
-  waitKey(0);
+    waitKey(0);
 
-  return EXIT_SUCCESS;
+    return EXIT_SUCCESS;
+  }
 }
 /*!
  \brief ウィンドウを表示し、結果を出力。
