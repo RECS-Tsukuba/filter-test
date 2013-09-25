@@ -7,7 +7,7 @@ target_link_libraries(linear_filter ${OpenCV_LIBS})
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set(CMAKE_CXX_COMPILER g++)
-  set(CMAKE_CXX_FLAGS "-std=c++0x -Wall")
+  set(CMAKE_CXX_FLAGS "-Wall")
   set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DDEBUG")
   set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 endif(CMAKE_SYSTEM_NAME STREQUAL "Linux")

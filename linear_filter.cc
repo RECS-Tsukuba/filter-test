@@ -1,7 +1,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
-#include <cstdint>
+#include <stdint.h>  // #include <cstdint>
 #include <cstdlib>
 #include <algorithm>
 #include <fstream>
@@ -85,7 +85,7 @@ int GetKernelSize(ifstream& stream) {
 */
 Mat GetKernel(const string& filename) {
   try {
-    ifstream stream(filename);
+    ifstream stream(filename.c_str());
     if (stream.good()) {
       int size = ::GetKernelSize(stream);
       // カーネルの領域を確保
