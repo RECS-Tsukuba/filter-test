@@ -176,27 +176,24 @@ int ShowWindow(const cv::Mat& original, const cv::Mat& filtered) {
 /*!
  \brief 画像のファイル名を取得。
 
- プログラム引数が2つの時はデフォルトの値'input.jpg'を、それ以上の場合は第二引
- 数をファイル名として返す。
+ プログラム引数が2つの時(画像ファイル名が指定されていない)はデフォルトの値
+ 'input.jpg'を、それ以上の場合は第二引数をファイル名として返す。
  
  \param agrc argc
  \param argv argv
  \return 画像のファイル名
 */
 std::string GetImageFilename(int argc, char** argv)
-  { return (argc == 2)? string("input.jpg"): string(argv[1]); }
+  { return (argc == 2)? string("input.jpg"): string(argv[2]); }
 /*!
  \brief カーネルを記述したファイル名を取得。
-
- プログラム引数が2つの場合は第二引数を、それ以上の場合は第三引数をファイル名と
- して返す。
 
  \param argc argc
  \param argv argv
  \return カーネルを記述したファイル名
  */
 std::string GetKernelFilename(int argc, char** argv)
-  { return (argc == 2)? string(argv[1]): string(argv[2]); }
+  { return string(argv[1]); }
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -211,7 +208,7 @@ int main(int argc, char** argv) {
   } else {
     exit(
         ::ShowErrorWindow(
-            string("Usage: linear_filter image_file filter_csv")));
+            string("Usage: linear_filter filter_csv [image_file]")));
   }
 
   return 0;
