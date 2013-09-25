@@ -33,7 +33,7 @@ namespace {
  \param line ファイルから読み込まれた文字列
  \param size カーネルのサイズ
 */
-void setOperator(Mat row, const string& line, uint64_t size) {
+void SetOperator(Mat row, const string& line, uint64_t size) {
   stringstream line_stream(line);
   for (uint64_t i = 0; i < size; ++i) {
     if (line_stream.good() && !line_stream.eof()) {
@@ -66,12 +66,12 @@ Mat GetKernel(const string& filename) {
     if (kernel.data == NULL) {
       return Mat();
     } else {
-      setOperator(kernel.row(0), line, size);
+      SetOperator(kernel.row(0), line, size);
 
       for (uint64_t i = 1; i < size; ++i) {
         if (stream.good() && !stream.eof()) {
           getline(stream, line);
-          setOperator(kernel.row(i), line, size);
+          SetOperator(kernel.row(i), line, size);
         } else { break; }
       }
 
