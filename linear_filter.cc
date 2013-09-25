@@ -57,6 +57,22 @@ void SetOperator(Mat row, const string& line, uint64_t size) {
   }
 }
 /*!
+ \brief カーネルの全ての要素へオペレータをセット。
+
+ \param kernel カーネル
+ \param stream ファイルストリーム
+ \param size カーネルのサイズ
+ \return カーネル
+ */
+Mat SetOperators(Mat kernel, ifstream& stream, int size) {
+  string line;
+  for (int i = 0;
+       i < size && stream.good() && !stream.eof() && getline(stream, line);
+       ++i) { SetOperator(kernel.row(i), line, size); }
+
+  return kernel;
+}
+/*!
  \brief カーネルのサイズを取得。
 
  \param stream カーネルのファイルストリーム
@@ -74,29 +90,15 @@ int GetKernelSize(ifstream& stream) {
  \return カーネル。エラーが起きた場合は空の画像
 */
 Mat GetKernel(const string& filename) {
-  ifstream stream(filename);
-
   try {
+    ifstream stream(filename);
     if (stream.good()) {
       int size = ::GetKernelSize(stream);
       // カーネルの領域を確保
       Mat kernel = Mat::zeros(size, size, cv::DataType<double>::type);
 
-      if (size <= 0 || kernel.data == NULL) {
-        return Mat();
-      } else {
-        ::Rewind(stream);
-
-        for (int i = 0; i < size; ++i) {
-          string line;
-          if (stream.good() && !stream.eof()) {
-            getline(stream, line);
-            SetOperator(kernel.row(i), line, size);
-          } else { break; }
-        }
-
-        return kernel;
-      }
+      return (size <= 0 || kernel.data == NULL)?
+        Mat(): SetOperators(kernel, ::Rewind(stream), size);
     } else { return Mat(); }
   } catch(...) { return Mat(); }
 }
