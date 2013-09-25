@@ -15,9 +15,10 @@ using std::cout;
 using std::cerr;
 using std::endl;
 using std::getline;
+using std::ifstream;
+using std::ios;
 using std::string;
 using std::stringstream;
-using std::ifstream;
 using cv::filter2D;
 using cv::imread;
 using cv::Mat;
@@ -26,6 +27,17 @@ using cv::Rect;
 using cv::waitKey;
 
 namespace {
+/*!
+ \brief ファイルストリームの走査位置を先頭へ戻す。
+
+ \param stream ファイルストリーム
+ \return ファイルストリーム
+ */
+ifstream& Rewind(ifstream& stream) {
+  stream.clear();
+  stream.seekg(0, ios::beg);
+  return stream;
+}
 /*
  \brief カーネルへオペレータをセット。
 
@@ -43,7 +55,21 @@ void SetOperator(Mat row, const string& line, uint64_t size) {
       row.at<double>(i) = static_cast<double>(atof(op.c_str()));
     } else { break; }
   }
-};
+}
+/*!
+ \brief カーネルのサイズを取得。
+
+ \param stream カーネルのファイルストリーム
+ \return カーネルのサイズ 
+ */
+int GetKernelSize(ifstream& stream) {
+  string line;
+  getline(stream, line);
+  // 最初の行からフィルタサイズを取得。
+  uint64_t size = count(line.begin(), line.end(), ',') + 1;
+
+  return size;
+}
 /*!
  \brief ファイルを読み込み、カーネルを取得する。
 
@@ -51,24 +77,20 @@ void SetOperator(Mat row, const string& line, uint64_t size) {
  \return カーネル。エラーが起きた場合は空の画像
 */
 Mat GetKernel(const string& filename) {
-  ifstream stream;
-  stream.open(filename);
+  ifstream stream(filename);
 
   if (stream.good()) {
-    string line;
-    getline(stream, line);
-
-    // 最初の行からフィルタサイズを取得。
-    uint64_t size = count(line.begin(), line.end(), ',') + 1;
+    int size = ::GetKernelSize(stream);
     // カーネルの領域を確保
     Mat kernel = Mat::zeros(size, size, cv::DataType<double>::type);
 
     if (kernel.data == NULL) {
       return Mat();
     } else {
-      SetOperator(kernel.row(0), line, size);
+      ::Rewind(stream);
 
-      for (uint64_t i = 1; i < size; ++i) {
+      for (int i = 0; i < size; ++i) {
+        string line;
         if (stream.good() && !stream.eof()) {
           getline(stream, line);
           SetOperator(kernel.row(i), line, size);
