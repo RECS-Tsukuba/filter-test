@@ -26,10 +26,8 @@ WindowsならばMicrosoft Visual Studioのプロジェクトファイルを生�
 > make
 
 ## 使い方
-> linear\_filter image\_file filter\_csv
+> linear\_filter filter\_csv [image\_file]
 
-### image\_file
-入力画像のファイル名。
 ### filter\_csv
 フィルタのオペレータを記述したCSVファイル。整数だけでなく小数も扱うことができます。行の最後に絶対にカンマを入れないでください。
 以下に例を示します。
@@ -56,5 +54,8 @@ WindowsならばMicrosoft Visual Studioのプロジェクトファイルを生�
 0.125,0.25,0.125
 0.0625,0.125,0.0625
 </pre>
+
+### image\_file
+入力画像のファイル名。省略可能。省略した場合、input.jpgを画像ファイル名として読み込む。
 
 
