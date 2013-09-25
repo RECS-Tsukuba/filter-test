@@ -76,27 +76,29 @@ int GetKernelSize(ifstream& stream) {
 Mat GetKernel(const string& filename) {
   ifstream stream(filename);
 
-  if (stream.good()) {
-    int size = ::GetKernelSize(stream);
-    // カーネルの領域を確保
-    Mat kernel = Mat::zeros(size, size, cv::DataType<double>::type);
+  try {
+    if (stream.good()) {
+      int size = ::GetKernelSize(stream);
+      // カーネルの領域を確保
+      Mat kernel = Mat::zeros(size, size, cv::DataType<double>::type);
 
-    if (size <= 0 || kernel.data == NULL) {
-      return Mat();
-    } else {
-      ::Rewind(stream);
+      if (size <= 0 || kernel.data == NULL) {
+        return Mat();
+      } else {
+        ::Rewind(stream);
 
-      for (int i = 0; i < size; ++i) {
-        string line;
-        if (stream.good() && !stream.eof()) {
-          getline(stream, line);
-          SetOperator(kernel.row(i), line, size);
-        } else { break; }
+        for (int i = 0; i < size; ++i) {
+          string line;
+          if (stream.good() && !stream.eof()) {
+            getline(stream, line);
+            SetOperator(kernel.row(i), line, size);
+          } else { break; }
+        }
+
+        return kernel;
       }
-
-      return kernel;
-    }
-  } else { return Mat(); }
+    } else { return Mat(); }
+  } catch(...) { return Mat(); }
 }
 /*!
  \brief 画像をカーネルに基づいた線形フィルタをかける。
