@@ -45,10 +45,10 @@ ifstream& Rewind(ifstream& stream) {
  \param line ファイルから読み込まれた文字列
  \param size カーネルのサイズ
 */
-void SetOperator(Mat row, const string& line, uint64_t size) {
+void SetOperator(Mat row, const string& line, int size) {
   stringstream line_stream(line);
   string op;
-  for (uint64_t i = 0; i < size && getline(line_stream, op, ','); ++i)
+  for (int i = 0; i < size && getline(line_stream, op, ','); ++i)
     { row.at<double>(i) = static_cast<double>(atof(op.c_str())); }
 }
 /*!
