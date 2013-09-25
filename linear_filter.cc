@@ -70,7 +70,7 @@ namespace {
  \return フィルタされた画像。元画像かカーネルにエラーがある場合、空の画像
 */
 Mat Filter(const Mat& src, const Mat& kernel) {
-  if (src.data != NULL && kernel.data != NULL) {
+  if (!src.empty() && !kernel.empty()) {
     Mat filtered;
     src.copyTo(filtered);
 
@@ -104,7 +104,7 @@ Mat GetKernel(const string& filename) {
       // カーネルの領域を確保
       Mat kernel = Mat::zeros(size, size, cv::DataType<double>::type);
 
-      return (size <= 0 || kernel.data == NULL)?
+      return (size <= 0 || kernel.empty())?
         Mat(): SetOperators(kernel, ::Rewind(stream), size);
     } else { return Mat(); }
   } catch(...) { return Mat(); }
@@ -222,9 +222,9 @@ int ShowImageWindow(const Mat& original, const Mat& filtered) {
  \param エラーコード
  */
 int ShowWindow(const Mat& original, const Mat& filtered) {
-  if (original.data == NULL) {
+  if (original.empty()) {
     return ShowErrorWindow(string("failed to open the image."));
-  } else if (filtered.data == NULL) {
+  } else if (filtered.empty()) {
     return ShowErrorWindow(string("failed to filter the image."));
   } else { return ShowImageWindow(original, filtered); }
 }
