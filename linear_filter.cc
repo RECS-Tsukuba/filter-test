@@ -60,15 +60,12 @@ void SetOperator(Mat row, const string& line, uint64_t size) {
  \brief カーネルのサイズを取得。
 
  \param stream カーネルのファイルストリーム
- \return カーネルのサイズ 
+ \return カーネルのサイズ。取得に失敗した場合は0
  */
 int GetKernelSize(ifstream& stream) {
   string line;
-  getline(stream, line);
-  // 最初の行からフィルタサイズを取得。
-  uint64_t size = count(line.begin(), line.end(), ',') + 1;
-
-  return size;
+  return (getline(stream, line).good())?
+    count(line.begin(), line.end(), ',') + 1: 0;
 }
 /*!
  \brief ファイルを読み込み、カーネルを取得する。
@@ -84,7 +81,7 @@ Mat GetKernel(const string& filename) {
     // カーネルの領域を確保
     Mat kernel = Mat::zeros(size, size, cv::DataType<double>::type);
 
-    if (kernel.data == NULL) {
+    if (size <= 0 || kernel.data == NULL) {
       return Mat();
     } else {
       ::Rewind(stream);
