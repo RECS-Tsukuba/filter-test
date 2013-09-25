@@ -47,14 +47,13 @@ ifstream& Rewind(ifstream& stream) {
 */
 void SetOperator(Mat row, const string& line, uint64_t size) {
   stringstream line_stream(line);
-  for (uint64_t i = 0; i < size; ++i) {
-    if (line_stream.good() && !line_stream.eof()) {
-      string op;
-      getline(line_stream, op, ',');
-      // オペレータをセット
-      row.at<double>(i) = static_cast<double>(atof(op.c_str()));
-    } else { break; }
-  }
+  string op;
+  for (uint64_t i = 0;
+      i < size &&
+        line_stream.good() &&
+        !line_stream.eof() &&
+        getline(line_stream, op, ',');
+      ++i) { row.at<double>(i) = static_cast<double>(atof(op.c_str())); }
 }
 /*!
  \brief カーネルの全ての要素へオペレータをセット。
