@@ -25,19 +25,24 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <cstdlib>
 #include <algorithm>
+#include <exception>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <sstream>
 #include <string>
 
 using std::atof;
+using std::bind;
 using std::count;
 using std::cout;
 using std::cerr;
 using std::endl;
+using std::exception;
 using std::getline;
 using std::ifstream;
 using std::ios;
+using std::placeholders::_1;
 using std::string;
 using std::stringstream;
 using cv::filter2D;
@@ -48,36 +53,83 @@ using cv::Rect;
 using cv::waitKey;
 
 namespace {
+
+template <typename F, typename G>
+class KleisliCompositedMatFunctor {
+ private:
+  F f_;
+  G g_;
+ public:
+  KleisliCompositedMatFunctor(F f, G g): f_(f), g_(g) {}
+ public:
+  template <typename... Args>
+  inline cv::Mat operator()(Args&&... args) {
+    cv::Mat r = f_(std::forward<Args>(args)...);
+    return (r.empty())? r: g_(r);
+  }
+};
+
+template <typename F, typename G>
+constexpr KleisliCompositedMatFunctor<F, G> operator>=(F f, G g) noexcept
+  { return KleisliCompositedMatFunctor<F, G>(f, g); }
+
+}  // namespace
+
+namespace {
+cv::Mat Conbime(Mat output, const cv::Mat& left, const cv::Mat& right);
 cv::Mat Filter(const cv::Mat& src, const cv::Mat& kernel);
+int GetExitCode(cv::Mat m) noexcept;
 std::string GetImageFilename(int argc, char** argv);
 cv::Mat GetKernel(const std::string& filename);
 std::string GetKernelFilename(int argc, char** argv);
 int GetKernelSize(std::ifstream& stream);
+int Help() noexcept;
+cv::Mat MakeOutputImage(const cv::Mat& src);
 std::ifstream& Rewind(std::ifstream& stream);
 void SetOperator(cv::Mat row, const string& line, int size);
 cv::Mat SetOperators(cv::Mat kernel, std::ifstream& stream, int size);
-int ShowErrorWindow(const std::string& error_message);
-int ShowImageWindow(const cv::Mat& original, const cv::Mat& filtered);
-int ShowWindow(const cv::Mat& original, const cv::Mat& filtered);
+Mat Show(cv::Mat image);
+
 }  // namespace
 
 namespace {
 /*!
+ \brief 二つの画像を水平に結合する。
+ 出力先である'output'は事前に確保する必要がある。
+ 'left'及び'right'の画像サイズは'output'の画像サイズの半分以下である必要がある。
+
+ \param output 出力先画像
+ \param left 左画像
+ \param right 右画像
+ \return 'output'
+ */
+Mat Combine(Mat output, const Mat& left, const Mat& right) {
+  left.copyTo(Mat(output, Rect(0, 0, left.cols, left.rows)));
+  right.copyTo(Mat(output, Rect(left.cols, 0, right.cols, right.rows)));
+  return output;
+}
+/*!
  \brief 画像をカーネルに基づいた線形フィルタをかける。
 
- \param src 元画像
+ \param original 元画像
  \param kernel カーネル
  \return フィルタされた画像。元画像かカーネルにエラーがある場合、空の画像
 */
-Mat Filter(const Mat& src, const Mat& kernel) {
-  if (!src.empty() && !kernel.empty()) {
-    Mat filtered;
-    src.copyTo(filtered);
+Mat Filter(const Mat& original, const Mat& kernel) {
+  Mat filtered;
+  original.copyTo(filtered);
 
-    filter2D(src, filtered, src.depth(), kernel, cv::Point(0, 0));
-    return filtered;
-  } else { return Mat(); }
+  filter2D(original, filtered, original.depth(), kernel, cv::Point(0, 0));
+  return filtered;
 }
+/*!
+ \brief 画像の状態に応じた終了コードを取得
+
+ \param m 画像
+ \return 'm'が正常ならばEXIT_SUCCESS、'm'にエラーがあるならばEXIT_FAILURE。
+ */
+int GetExitCode(cv::Mat m) noexcept
+  { return (m.empty())? EXIT_FAILURE: EXIT_SUCCESS; }
 /*!
  \brief 画像のファイル名を取得。
 
@@ -97,17 +149,15 @@ string GetImageFilename(int argc, char** argv)
  \return カーネル。エラーが起きた場合は空の画像
 */
 Mat GetKernel(const string& filename) {
-  try {
-    ifstream stream(filename.c_str());
-    if (stream.good()) {
-      int size = ::GetKernelSize(stream);
-      // カーネルの領域を確保
-      Mat kernel = Mat::zeros(size, size, cv::DataType<double>::type);
+  ifstream stream(filename.c_str());
+  if (stream.good()) {
+    int size = ::GetKernelSize(stream);
+    // カーネルの領域を確保
+    Mat kernel = Mat::zeros(size, size, cv::DataType<double>::type);
 
-      return (size <= 0 || kernel.empty())?
-        Mat(): SetOperators(kernel, ::Rewind(stream), size);
-    } else { return Mat(); }
-  } catch(...) { return Mat(); }
+    return (size <= 0 || kernel.empty())?
+      Mat(): SetOperators(kernel, ::Rewind(stream), size);
+  } else { return Mat(); }
 }
 /*!
  \brief カーネルを記述したファイル名を取得。
@@ -127,6 +177,25 @@ int GetKernelSize(ifstream& stream) {
   string line;
   return (getline(stream, line))?
     count(line.begin(), line.end(), ',') + 1: 0;
+}
+/*!
+ \brief ヘルプを表示。
+
+ \return 常にEXIT_SUCCESS
+ */
+int Help() noexcept {
+  cerr <<"Usage: linear_filter filter_csv [image_file]" << std::endl;
+  return EXIT_SUCCESS;
+}
+/*!
+ \brief 出力先の画像を生成。
+ 元画像の二倍の大きさの、空の画像を生成する。
+
+ \param src 元画像
+ \return 出力先画像
+ */
+Mat MakeOutputImage(const Mat& src) {
+  return Mat::zeros(src.size().height, src.size().width * 2, src.type());
 }
 /*!
  \brief ファイルストリームの走査位置を先頭へ戻す。
@@ -168,85 +237,59 @@ Mat SetOperators(Mat kernel, ifstream& stream, int size) {
   return kernel;
 }
 /*!
- \brief エラーメッセージをウィンドウ名として表示。
+ \brief 画像をウィンドウへ表示。
 
- ウィンドウが閉じられた時、標準エラー出力にもエラーメッセージを出力する。
-
- \TODO もっといいエラーの表示方法はないものか...
-
- \param error_message エラーメッセージ
- \return 常ににEXIT_FAILURE
+ \param image 画像
+ \return 'image'
 */
-int ShowErrorWindow(const string& error_message) {
-  namedWindow(error_message, CV_WINDOW_AUTOSIZE);
+Mat Show(Mat image) {
+  string window_name("linear_filter");
+  namedWindow(window_name, CV_WINDOW_AUTOSIZE);
+  imshow(window_name, image);
+
   waitKey(0);
 
-  cerr << error_message << endl;
-
-  return EXIT_FAILURE;
+  return image;
 }
-/*!
- \brief 元画像をフィルタされた画像を表示。
 
- \param original 元画像
- \param filtered フィルタされた画像
- \return 常にEXIT_SUCCESS
-*/
-int ShowImageWindow(const Mat& original, const Mat& filtered) {
-  Mat output = Mat::zeros(
-      original.size().height,
-      original.size().width * 2,
-      original.type());
+}  // namespace
 
-  if (output.empty()) {
-    return ShowErrorWindow("failed to allocate an output image");
-  } else {
-    // 元画像とフィルタされた画像を結合
-    original.copyTo(Mat(output, Rect(0, 0, original.cols, original.rows)));
-    filtered.copyTo(
-        Mat(output, Rect(original.cols, 0, original.cols, original.rows)));
+namespace {
+auto get_image = [](int argc, char** argv) {
+  return imread(::GetImageFilename(argc, argv), CV_LOAD_IMAGE_GRAYSCALE);
+};
 
-    string window_name("linear_filter");
-    namedWindow(window_name, CV_WINDOW_AUTOSIZE);
-    imshow(window_name, output);
+auto get_kernel = [](int argc, char** argv)
+  { return ::GetKernel(::GetKernelFilename(argc, argv)); };
 
-    waitKey(0);
+auto show = [](Mat src, Mat filtered) {
+  auto show_detail = ::MakeOutputImage >=
+    bind(Combine, _1, src, filtered) >= ::Show;
+  return show_detail(src);
+};
 
-    return EXIT_SUCCESS;
-  }
-}
-/*!
- \brief ウィンドウを表示し、結果を出力。
+auto test_filter = [](int argc, char** argv) {
+  auto filter_tester = bind(get_image, argc, argv) >=
+    [argc, argv](Mat src) {
+      auto filter_and_show = get_kernel >= bind(Filter, src, _1) >=
+        bind(show, src, _1);
+      return filter_and_show(argc, argv);
+    };
 
- 　'original'か'filtered'にエラーがある場合、エラーウィンドウを表示する。それ以
- 外の場合はフィルタされた画像を表示する。
+  return filter_tester(argc, argv);
+};
 
- \param original 元画像
- \param filtered フィルタされた画像
- \param エラーコード
- */
-int ShowWindow(const Mat& original, const Mat& filtered) {
-  if (original.empty()) {
-    return ShowErrorWindow(string("failed to open the image."));
-  } else if (filtered.empty()) {
-    return ShowErrorWindow(string("failed to filter the image."));
-  } else { return ShowImageWindow(original, filtered); }
-}
 }  // namespace
 
 int main(int argc, char** argv) {
-  if (argc == 2 || argc == 3) {
-    Mat original = imread(::GetImageFilename(argc, argv),
-                          CV_LOAD_IMAGE_GRAYSCALE);
-
-    exit(
-        ::ShowWindow(
-            original,
-            ::Filter(original, ::GetKernel(::GetKernelFilename(argc, argv)))));
-  } else {
-    exit(
-        ::ShowErrorWindow(
-            string("Usage: linear_filter filter_csv [image_file]")));
+  try {
+    exit((argc >= 2)?  ::GetExitCode(::test_filter(argc, argv)): ::Help());
+  } catch(const exception& e) {
+    cerr << e.what() << std::endl;
+    exit(EXIT_FAILURE);
+  } catch(...) {
+    cerr << "failed to filter the image" << std::endl;
+    exit(EXIT_FAILURE);
   }
 
   return 0;
