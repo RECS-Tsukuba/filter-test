@@ -3,6 +3,13 @@ CMakeCache.txt
 CMakeFiles/
 Makefile
 *.cmake
+# image
+*.bmp
+*.gif
+*.jpg
+*.jpeg
+*.png
+*.svg
 # vim
 .exrc
 *.swp
