@@ -269,7 +269,7 @@ auto show = [](Mat src, Mat filtered) {
 };
 
 auto test_filter = [](int argc, char** argv) {
-  auto filter_tester = bind(get_image, argc, argv) >=
+  auto filter_tester = get_image >=
     [argc, argv](Mat src) {
       auto filter_and_show = get_kernel >= bind(Filter, src, _1) >=
         bind(show, src, _1);
