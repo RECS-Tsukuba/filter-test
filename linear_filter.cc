@@ -53,22 +53,44 @@ using cv::Rect;
 using cv::waitKey;
 
 namespace {
+/*!
+ \brief Kleisli合成された関数オブジェクト
 
+ (a -> m b) -> (b -> m c) -> a -> m c
+ */
 template <typename F, typename G>
 class KleisliCompositedMatFunctor {
  private:
   F f_;
   G g_;
  public:
+  /*!
+   \brief Kleisli合成された関数オブジェクトを生成する
+
+   \param f cv::Matを引数とする関数
+   \param g cv::Matを引数と戻り値とする関数
+   */
   KleisliCompositedMatFunctor(F f, G g): f_(f), g_(g) {}
  public:
+  /*!
+   \brief Kleisli合成された関数の実体
+
+   \param args fの引数
+   \return gの戻り値
+   */
   template <typename... Args>
   inline cv::Mat operator()(Args&&... args) {
     cv::Mat r = f_(std::forward<Args>(args)...);
     return (r.empty())? r: g_(r);
   }
 };
+/*!
+ \brief 二つの関数に対してKleisli合成を行う。
 
+ \param f cv::Matを引数とする関数
+ \param g cv::Matを引数と戻り値とする関数
+ \return Kleisli合成された関数オブジェクト
+ */
 template <typename F, typename G>
 constexpr KleisliCompositedMatFunctor<F, G> operator>=(F f, G g) noexcept
   { return KleisliCompositedMatFunctor<F, G>(f, g); }
