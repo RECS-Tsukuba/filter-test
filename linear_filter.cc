@@ -43,6 +43,7 @@ using std::getline;
 using std::ifstream;
 using std::ios;
 using std::placeholders::_1;
+using std::placeholders::_2;
 using std::string;
 using std::stringstream;
 using cv::filter2D;
@@ -105,13 +106,14 @@ std::string GetImageFilename(int argc, char** argv);
 cv::Mat GetKernel(const std::string& filename);
 std::string GetKernelFilename(int argc, char** argv);
 int GetKernelSize(std::ifstream& stream);
+cv::Mat HandleEmpty(cv::Mat m, const char* const error_message);
 int Help() noexcept;
 cv::Mat MakeOutputImage(const cv::Mat& src);
+void ExitFailure(const char* const error_message);
 std::ifstream& Rewind(std::ifstream& stream);
 void SetOperator(cv::Mat row, const string& line, int size);
 cv::Mat SetOperators(cv::Mat kernel, std::ifstream& stream, int size);
 Mat Show(cv::Mat image);
-
 }  // namespace
 
 namespace {
@@ -210,6 +212,17 @@ int Help() noexcept {
   return EXIT_SUCCESS;
 }
 /*!
+ \brief 空の画像だった場合、エラーメッセージを表示し終了する
+
+ \param m 画像
+ \param error_message エラーメッセージ 
+ \return m
+ */
+Mat HandleEmpty(Mat m, const char* const error_message) {
+  if (m.empty()) { ::ExitFailure(error_message); }
+  return m;
+}
+/*!
  \brief 出力先の画像を生成。
  元画像の二倍の大きさの、空の画像を生成する。
 
@@ -218,6 +231,15 @@ int Help() noexcept {
  */
 Mat MakeOutputImage(const Mat& src) {
   return Mat::zeros(src.size().height, src.size().width * 2, src.type());
+}
+/*!
+ \brief エラーメッセージを表示し、終了する
+
+ \param error_message エラーメッセージ
+ */
+void ExitFailure(const char* const error_message) {
+  cerr << "error: " << error_message << endl;
+  exit(EXIT_FAILURE);
 }
 /*!
  \brief ファイルストリームの走査位置を先頭へ戻す。
@@ -285,16 +307,23 @@ auto get_kernel = [](int argc, char** argv)
   { return ::GetKernel(::GetKernelFilename(argc, argv)); };
 
 auto show = [](Mat src, Mat filtered) {
-  auto show_impl = ::MakeOutputImage >=
+  auto show_impl =
+    bind(::HandleEmpty,
+         bind(::MakeOutputImage, _1),
+         "failed to create an output image") >=
     bind(::Combine, _1, src, filtered) >=
     ::Show;
   return show_impl(src);
 };
 
 auto test_filter = [](int argc, char** argv) {
-  auto test_filter_impl = get_image >=
+  auto test_filter_impl =
+    bind(::HandleEmpty, bind(get_image, _1, _2), "failed to read an image") >=
     [argc, argv](Mat src) {
-      auto impl = get_kernel >=
+      auto impl =
+        bind(::HandleEmpty,
+             bind(get_kernel, _1, _2),
+             "failed to read a kernel") >=
         bind(::Filter, src, _1) >=
         bind(show, src, _1);
       return impl(argc, argv);
@@ -307,13 +336,11 @@ auto test_filter = [](int argc, char** argv) {
 
 int main(int argc, char** argv) {
   try {
-    exit((argc >= 2)?  ::GetExitCode(::test_filter(argc, argv)): ::Help());
+    exit((argc >= 2)? ::GetExitCode(::test_filter(argc, argv)): ::Help());
   } catch(const exception& e) {
-    cerr << e.what() << std::endl;
-    exit(EXIT_FAILURE);
+    ::ExitFailure(e.what());
   } catch(...) {
-    cerr << "failed to filter the image" << std::endl;
-    exit(EXIT_FAILURE);
+    ::ExitFailure("some exception was thrown");
   }
 
   return 0;
