@@ -285,20 +285,22 @@ auto get_kernel = [](int argc, char** argv)
   { return ::GetKernel(::GetKernelFilename(argc, argv)); };
 
 auto show = [](Mat src, Mat filtered) {
-  auto show_detail = ::MakeOutputImage >=
-    bind(Combine, _1, src, filtered) >= ::Show;
-  return show_detail(src);
+  auto show_impl = ::MakeOutputImage >=
+    bind(::Combine, _1, src, filtered) >=
+    ::Show;
+  return show_impl(src);
 };
 
 auto test_filter = [](int argc, char** argv) {
-  auto filter_tester = get_image >=
+  auto test_filter_impl = get_image >=
     [argc, argv](Mat src) {
-      auto filter_and_show = get_kernel >= bind(Filter, src, _1) >=
+      auto impl = get_kernel >=
+        bind(::Filter, src, _1) >=
         bind(show, src, _1);
-      return filter_and_show(argc, argv);
+      return impl(argc, argv);
     };
 
-  return filter_tester(argc, argv);
+  return test_filter_impl(argc, argv);
 };
 
 }  // namespace
