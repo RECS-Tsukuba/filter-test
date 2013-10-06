@@ -29,6 +29,10 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+// 2013/10現在、標準ライブラリの<regex>は実装されていないため、boost
+// ライブラリを使用する
+#include <boost/regex.hpp>
+//#include <regex>
 #include <sstream>
 #include <string>
 
@@ -44,6 +48,11 @@ using std::ifstream;
 using std::ios;
 using std::placeholders::_1;
 using std::placeholders::_2;
+// 2013/10現在、標準ライブラリの<regex>は実装されていないため、boost
+// ライブラリを使用する
+//using std::regex;
+//using std::regex_match;
+//using std::regex_constants::extended;
 using std::string;
 using std::stringstream;
 using cv::filter2D;
@@ -52,6 +61,9 @@ using cv::Mat;
 using cv::namedWindow;
 using cv::Rect;
 using cv::waitKey;
+using boost::regex;
+using boost::regex_match;
+using boost::regex_constants::extended;
 
 namespace {
 /*!
@@ -99,6 +111,7 @@ constexpr KleisliCompositedMatFunctor<F, G> operator>=(F f, G g) noexcept
 }  // namespace
 
 namespace {
+bool CheckKernelLine(const std::string& line);
 cv::Mat Conbime(Mat output, const cv::Mat& left, const cv::Mat& right);
 cv::Mat Filter(const cv::Mat& src, const cv::Mat& kernel);
 int GetExitCode(cv::Mat m) noexcept;
@@ -117,6 +130,15 @@ Mat Show(cv::Mat image);
 }  // namespace
 
 namespace {
+/*!
+ \brief 文字列がカーネルの一行を表しているか判定する
+
+ \param line 文字列
+ \return カーネルの一行を示している場合、true。それ以外の場合false
+ */
+bool CheckKernelLine(const string& line) {
+  return regex_match(line, regex("(-*[0-9.]+,)*(-*[0-9.]+)", extended));
+}
 /*!
  \brief 二つの画像を水平に結合する。
  出力先である'output'は事前に確保する必要がある。
@@ -199,7 +221,7 @@ string GetKernelFilename(int argc, char** argv) { return string(argv[1]); }
  */
 int GetKernelSize(ifstream& stream) {
   string line;
-  return (getline(stream, line))?
+  return (getline(stream, line) && ::CheckKernelLine(line))?
     count(line.begin(), line.end(), ',') + 1: 0;
 }
 /*!
@@ -275,7 +297,9 @@ void SetOperator(Mat row, const string& line, int size) {
  */
 Mat SetOperators(Mat kernel, ifstream& stream, int size) {
   string line;
-  for (int i = 0; i < size && getline(stream, line); ++i)
+  for (int i = 0;
+       i < size && getline(stream, line) && ::CheckKernelLine(line);
+       ++i)
     { SetOperator(kernel.row(i), line, size); }
 
   return kernel;
