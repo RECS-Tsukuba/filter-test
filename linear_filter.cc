@@ -60,6 +60,7 @@ using cv::filter2D;
 using cv::imread;
 using cv::Mat;
 using cv::namedWindow;
+using cv::Point;
 using cv::Rect;
 using cv::waitKey;
 using boost::regex;
@@ -166,7 +167,7 @@ Mat Filter(const Mat& original, const Mat& kernel) {
   Mat filtered;
   original.copyTo(filtered);
 
-  filter2D(original, filtered, original.depth(), kernel, cv::Point(0, 0));
+  filter2D(original, filtered, original.depth(), kernel, Point(-1, -1));
   return filtered;
 }
 /*!
