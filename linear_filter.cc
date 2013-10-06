@@ -44,6 +44,7 @@ using cv::filter2D;
 using cv::imread;
 using cv::Mat;
 using cv::namedWindow;
+using cv::Point;
 using cv::Rect;
 using cv::waitKey;
 
@@ -74,7 +75,7 @@ Mat Filter(const Mat& src, const Mat& kernel) {
     Mat filtered;
     src.copyTo(filtered);
 
-    filter2D(src, filtered, src.depth(), kernel, cv::Point(0, 0));
+    filter2D(src, filtered, src.depth(), kernel, Point(-1, -1));
     return filtered;
   } else { return Mat(); }
 }
