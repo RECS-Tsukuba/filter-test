@@ -48,6 +48,7 @@ using std::ifstream;
 using std::ios;
 using std::placeholders::_1;
 using std::placeholders::_2;
+using std::ref;
 // 2013/10現在、標準ライブラリの<regex>は実装されていないため、boost
 // ライブラリを使用する
 //using std::regex;
@@ -107,7 +108,6 @@ class KleisliCompositedMatFunctor {
 template <typename F, typename G>
 constexpr KleisliCompositedMatFunctor<F, G> operator>=(F f, G g) noexcept
   { return KleisliCompositedMatFunctor<F, G>(f, g); }
-
 }  // namespace
 
 namespace {
@@ -121,11 +121,13 @@ std::string GetKernelFilename(int argc, char** argv);
 int GetKernelSize(std::ifstream& stream);
 cv::Mat HandleEmpty(cv::Mat m, const char* const error_message);
 int Help() noexcept;
+cv::Mat MakeKernel(int size);
 cv::Mat MakeOutputImage(const cv::Mat& src);
 void ExitFailure(const char* const error_message);
 std::ifstream& Rewind(std::ifstream& stream);
 void SetOperator(cv::Mat row, const string& line, int size);
-cv::Mat SetOperators(cv::Mat kernel, std::ifstream& stream, int size);
+cv::Mat SetOperators(cv::Mat kernel, std::ifstream& stream);
+cv::Mat SetOperators_impl(cv::Mat kernel, std::ifstream& stream);
 Mat Show(cv::Mat image);
 }  // namespace
 
@@ -136,9 +138,8 @@ namespace {
  \param line 文字列
  \return カーネルの一行を示している場合、true。それ以外の場合false
  */
-bool CheckKernelLine(const string& line) {
-  return regex_match(line, regex("(-*[0-9.]+,)*(-*[0-9.]+)", extended));
-}
+bool CheckKernelLine(const string& line)
+  { return regex_match(line, regex("(-*[0-9.]+,)*(-*[0-9.]+)", extended)); }
 /*!
  \brief 二つの画像を水平に結合する。
  出力先である'output'は事前に確保する必要がある。
@@ -196,14 +197,8 @@ string GetImageFilename(int argc, char** argv)
 */
 Mat GetKernel(const string& filename) {
   ifstream stream(filename.c_str());
-  if (stream.good()) {
-    int size = ::GetKernelSize(stream);
-    // カーネルの領域を確保
-    Mat kernel = Mat::zeros(size, size, cv::DataType<double>::type);
-
-    return (size <= 0 || kernel.empty())?
-      Mat(): SetOperators(kernel, ::Rewind(stream), size);
-  } else { return Mat(); }
+  auto impl = ::MakeKernel >= bind(SetOperators, _1, ref(stream));
+  return (stream.good())? impl(::GetKernelSize(stream)): Mat();
 }
 /*!
  \brief カーネルを記述したファイル名を取得。
@@ -244,6 +239,10 @@ Mat HandleEmpty(Mat m, const char* const error_message) {
   if (m.empty()) { ::ExitFailure(error_message); }
   return m;
 }
+Mat MakeKernel(int size) {
+  return (size == 0)?
+    Mat():Mat::zeros(size, size, cv::DataType<double>::type);
+}
 /*!
  \brief 出力先の画像を生成。
  元画像の二倍の大きさの、空の画像を生成する。
@@ -251,9 +250,8 @@ Mat HandleEmpty(Mat m, const char* const error_message) {
  \param src 元画像
  \return 出力先画像
  */
-Mat MakeOutputImage(const Mat& src) {
-  return Mat::zeros(src.size().height, src.size().width * 2, src.type());
-}
+Mat MakeOutputImage(const Mat& src)
+  { return Mat::zeros(src.size().height, src.size().width * 2, src.type()); }
 /*!
  \brief エラーメッセージを表示し、終了する
 
@@ -292,15 +290,23 @@ void SetOperator(Mat row, const string& line, int size) {
 
  \param kernel カーネル
  \param stream ファイルストリーム
- \param size カーネルのサイズ
  \return カーネル
  */
-Mat SetOperators(Mat kernel, ifstream& stream, int size) {
+Mat SetOperators(Mat kernel, ifstream& stream)
+  { return SetOperators_impl(kernel, ::Rewind(stream)); }
+/*!
+ \brief カーネルの全ての要素へオペレータをセット。
+
+ \param kernel カーネル
+ \param stream ファイルストリーム
+ \return カーネル
+ */
+Mat SetOperators_impl(Mat kernel, ifstream& stream) {
   string line;
   for (int i = 0;
-       i < size && getline(stream, line) && ::CheckKernelLine(line);
+       i < kernel.rows && getline(stream, line) && ::CheckKernelLine(line);
        ++i)
-    { SetOperator(kernel.row(i), line, size); }
+    { SetOperator(kernel.row(i), line, kernel.cols); }
 
   return kernel;
 }
@@ -319,7 +325,6 @@ Mat Show(Mat image) {
 
   return image;
 }
-
 }  // namespace
 
 namespace {
@@ -355,7 +360,6 @@ auto test_filter = [](int argc, char** argv) {
 
   return test_filter_impl(argc, argv);
 };
-
 }  // namespace
 
 int main(int argc, char** argv) {
