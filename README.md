@@ -10,6 +10,7 @@
 * C++コンパイラ
 * CMake
 * OpenCVライブラリ
+* Boost.Program\_options
 
 ## コンパイル
 ### プロジェクトファイル、Makefileの生成
@@ -26,7 +27,7 @@ WindowsならばMicrosoft Visual Studioのプロジェクトファイルを生�
 > make
 
 ## 使い方
-> linear\_filter filter\_csv [image\_file]
+> linear\_filter [options] filter\_csv [image\_file]
 
 ### filter\_csv
 フィルタのオペレータを記述したCSVファイル。整数だけでなく小数も扱うことができます。行の最後に絶対にカンマを入れないでください。
@@ -58,4 +59,5 @@ WindowsならばMicrosoft Visual Studioのプロジェクトファイルを生�
 ### image\_file
 入力画像のファイル名。省略可能。省略した場合、input.jpgを画像ファイル名として読み込む。
 
-
+## オプション
+* '-d' <delta>: デルタの値を指定します。デフォルトは0です。
