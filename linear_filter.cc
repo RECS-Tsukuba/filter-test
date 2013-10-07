@@ -163,7 +163,7 @@ inline po::options_description MakeOptionsDescription() {
 namespace {
 bool CheckKernelLine(const std::string& line);
 cv::Mat Conbime(Mat output, const cv::Mat& left, const cv::Mat& right);
-cv::Mat Filter(const cv::Mat& src, const cv::Mat& kernel);
+cv::Mat Filter(const cv::Mat& src, const cv::Mat& kernel, double delta);
 int GetExitCode(cv::Mat m) noexcept;
 std::string GetImageFilename(
     const boost::program_options::variables_map& vm);
@@ -214,13 +214,14 @@ Mat Combine(Mat output, const Mat& left, const Mat& right) {
 
  \param original 元画像
  \param kernel カーネル
+ \param delta デルタ
  \return フィルタされた画像。元画像かカーネルにエラーがある場合、空の画像
 */
-Mat Filter(const Mat& original, const Mat& kernel) {
+Mat Filter(const Mat& original, const Mat& kernel, double delta) {
   Mat filtered;
   original.copyTo(filtered);
 
-  filter2D(original, filtered, original.depth(), kernel, Point(-1, -1));
+  filter2D(original, filtered, original.depth(), kernel, Point(-1, -1), delta);
   return filtered;
 }
 /*!
@@ -432,7 +433,7 @@ auto test_filter = [](const po::variables_map& vm) {
         bind(::HandleEmpty,
              bind(get_kernel, _1),
              "failed to read a kernel") >=
-        bind(::Filter, src, _1) >=
+        bind(::Filter, src, _1, vm[::delta_option_name].as<double>()) >=
         bind(show, src, _1);
       return impl(vm);
     };
