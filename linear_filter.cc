@@ -20,6 +20,7 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
  */
+#include <boost/program_options.hpp>
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -29,12 +30,17 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <boost/optional.hpp>
 // 2013/10現在、標準ライブラリの<regex>は実装されていないため、boost
 // ライブラリを使用する
 #include <boost/regex.hpp>
 //#include <regex>
 #include <sstream>
 #include <string>
+#include <vector>
+
+// C++14用
+#define nullopt none
 
 using std::atof;
 using std::bind;
@@ -46,6 +52,10 @@ using std::exception;
 using std::getline;
 using std::ifstream;
 using std::ios;
+// C++14用
+using boost::make_optional;
+using boost::nullopt;
+using boost::optional;
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::ref;
@@ -66,6 +76,7 @@ using cv::waitKey;
 using boost::regex;
 using boost::regex_match;
 using boost::regex_constants::extended;
+namespace po = boost::program_options;
 
 namespace {
 /*!
@@ -112,16 +123,58 @@ constexpr KleisliCompositedMatFunctor<F, G> operator>=(F f, G g) noexcept
 }  // namespace
 
 namespace {
+constexpr const char* const delta_option_name = "delta";
+constexpr const char* const filename_option_name = "filename";
+constexpr const char* const help_option_name = "help";
+}  // namespace
+
+namespace {
+using filename_vector_t = std::vector<std::string>;
+}  // namespace
+
+namespace {
+
+inline po::options_description MakeOtherDescription() {
+  po::options_description description;
+  description.add_options()
+    ("delta,d",
+     po::value<double>()->default_value(0.0),
+     "Specify value of delta")
+    ("help,h", "Show this");
+  return description;
+}
+
+inline po::options_description MakeFilenameDescription() {
+  po::options_description description;
+  description.add_options()
+    (::filename_option_name,
+     po::value< ::filename_vector_t>()->required(),
+     "finename option implication");
+  return description;
+}
+
+inline po::options_description MakeOptionsDescription() {
+  po::options_description description;
+  description.add(::MakeFilenameDescription()).add(::MakeOtherDescription());
+  return description;
+}
+}  // namespace
+
+namespace {
 bool CheckKernelLine(const std::string& line);
 cv::Mat Conbime(Mat output, const cv::Mat& left, const cv::Mat& right);
 cv::Mat Filter(const cv::Mat& src, const cv::Mat& kernel);
 int GetExitCode(cv::Mat m) noexcept;
-std::string GetImageFilename(int argc, char** argv);
+std::string GetImageFilename(
+    const boost::program_options::variables_map& vm);
 cv::Mat GetKernel(const std::string& filename);
-std::string GetKernelFilename(int argc, char** argv);
+std::string GetKernelFilename(
+    const boost::program_options::variables_map& vm);
 int GetKernelSize(std::ifstream& stream);
+boost::optional<boost::program_options::variables_map>
+GetVariablesMap(int argc, char** argv);
 cv::Mat HandleEmpty(cv::Mat m, const char* const error_message);
-int Help() noexcept;
+int Help();
 cv::Mat MakeKernel(int size);
 cv::Mat MakeOutputImage(const cv::Mat& src);
 void ExitFailure(const char* const error_message);
@@ -181,15 +234,16 @@ int GetExitCode(cv::Mat m) noexcept
 /*!
  \brief 画像のファイル名を取得。
 
- プログラム引数が2つの時(画像ファイル名が指定されていない)はデフォルトの値
+ 画像ファイル名が指定されていない場合はデフォルトの値
  'input.jpg'を、それ以上の場合は第二引数をファイル名として返す。
  
- \param agrc argc
- \param argv argv
+ \param vm プログラム引数のマップ
  \return 画像のファイル名
 */
-string GetImageFilename(int argc, char** argv)
-  { return (argc == 2)? string("input.jpg"): string(argv[2]); }
+string GetImageFilename(const po::variables_map& vm) {
+  auto& filenames = vm[::filename_option_name].as< ::filename_vector_t>();
+  return (filenames.size() >= 2)? filenames.at(1): string("input.jpg");
+}
 /*!
  \brief ファイルを読み込み、カーネルを取得する。
 
@@ -204,11 +258,11 @@ Mat GetKernel(const string& filename) {
 /*!
  \brief カーネルを記述したファイル名を取得。
 
- \param argc argc
- \param argv argv
+ \param vm プログラム引数のマップ
  \return カーネルを記述したファイル名
  */
-string GetKernelFilename(int argc, char** argv) { return string(argv[1]); }
+string GetKernelFilename(const po::variables_map& vm)
+  { return vm[::filename_option_name].as< ::filename_vector_t>().at(0); }
 /*!
  \brief カーネルのサイズを取得。
 
@@ -221,13 +275,25 @@ int GetKernelSize(ifstream& stream) {
     count(line.begin(), line.end(), ',') + 1: 0;
 }
 /*!
- \brief ヘルプを表示。
+ \brief argc,argvからプログラム引数のマップを取得。
 
- \return 常にEXIT_SUCCESS
+ \param agrc argc
+ \param argv argv
+ \return プログラム引数のマップ。プログラム引数にエラーがあった場合nullopt
  */
-int Help() noexcept {
-  cerr <<"Usage: linear_filter filter_csv [image_file]" << std::endl;
-  return EXIT_SUCCESS;
+optional<po::variables_map> GetVariablesMap(int argc, char** argv) {
+  try {
+    po::variables_map vm;
+
+    po::positional_options_description p;
+    p.add(::filename_option_name, -1);
+
+    po::store(po::command_line_parser(argc, argv).
+              options(MakeOptionsDescription()).positional(p).run(),
+              vm);
+    po::notify(vm);
+    return make_optional(vm);
+  } catch(...) { return nullopt; }
 }
 /*!
  \brief 空の画像だった場合、エラーメッセージを表示し終了する
@@ -239,6 +305,19 @@ int Help() noexcept {
 Mat HandleEmpty(Mat m, const char* const error_message) {
   if (m.empty()) { ::ExitFailure(error_message); }
   return m;
+}
+/*!
+ \brief ヘルプを表示。
+
+ \return 常にEXIT_SUCCESS
+ */
+int Help() {
+  cout << "linear_filter [options] kernel_filename [image_filename]" << endl;
+  cout << "  kernel_filename kernel filename. Required" << endl;
+  cout << "  image_filename  image filename. Default value is " <<
+    "'input.jpg'" << endl;
+  cout << MakeOtherDescription() << endl;
+  return EXIT_SUCCESS;
 }
 Mat MakeKernel(int size) {
   return (size == 0)?
@@ -329,12 +408,11 @@ Mat Show(Mat image) {
 }  // namespace
 
 namespace {
-auto get_image = [](int argc, char** argv) {
-  return imread(::GetImageFilename(argc, argv), CV_LOAD_IMAGE_GRAYSCALE);
-};
+auto get_image = [](const po::variables_map& vm)
+  { return imread(::GetImageFilename(vm), CV_LOAD_IMAGE_GRAYSCALE); };
 
-auto get_kernel = [](int argc, char** argv)
-  { return ::GetKernel(::GetKernelFilename(argc, argv)); };
+auto get_kernel = [](const po::variables_map& vm)
+  { return ::GetKernel(::GetKernelFilename(vm)); };
 
 auto show = [](Mat src, Mat filtered) {
   auto show_impl =
@@ -346,26 +424,29 @@ auto show = [](Mat src, Mat filtered) {
   return show_impl(src);
 };
 
-auto test_filter = [](int argc, char** argv) {
+auto test_filter = [](const po::variables_map& vm) {
   auto test_filter_impl =
-    bind(::HandleEmpty, bind(get_image, _1, _2), "failed to read an image") >=
-    [argc, argv](Mat src) {
+    bind(::HandleEmpty, bind(get_image, _1), "failed to read an image") >=
+    [&vm](Mat src) {
       auto impl =
         bind(::HandleEmpty,
-             bind(get_kernel, _1, _2),
+             bind(get_kernel, _1),
              "failed to read a kernel") >=
         bind(::Filter, src, _1) >=
         bind(show, src, _1);
-      return impl(argc, argv);
+      return impl(vm);
     };
 
-  return test_filter_impl(argc, argv);
+  return test_filter_impl(vm);
 };
 }  // namespace
 
 int main(int argc, char** argv) {
   try {
-    exit((argc >= 2)? ::GetExitCode(::test_filter(argc, argv)): ::Help());
+    auto vm_opt = ::GetVariablesMap(argc, argv);
+    exit(
+        (vm_opt && vm_opt->count(::help_option_name) < 1)?
+          ::GetExitCode(::test_filter(*vm_opt)): ::Help());
   } catch(const exception& e) {
     ::ExitFailure(e.what());
   } catch(...) {
