@@ -13,5 +13,7 @@ Makefile
 # vim
 .exrc
 *.swp
+# documentation
+html/*
 # binary
 linear_filter
