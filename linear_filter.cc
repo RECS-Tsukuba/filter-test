@@ -295,6 +295,13 @@ int Help() {
   cout << MakeOtherDescription() << endl;
   return EXIT_SUCCESS;
 }
+/*!
+ \brief ファイル名のプログラム引数のdescriptionを生成。
+ この関数はヘルプを生成する際には使用すべきではないだろう。
+ Boost.program_optionsはタグ無しの引数に対して、望むフォーマットで出力しないためである。
+
+ \return ファイル名のプログラム引数のdescription
+ */
 po::options_description MakeFilenameDescription() {
   po::options_description description;
   description.add_options()
@@ -307,11 +314,22 @@ Mat MakeKernel(int size) {
   return (size == 0)?
     Mat():Mat::zeros(size, size, cv::DataType<double>::type);
 }
+/*!
+ \brief プログラム引数のdescriptionを生成。
+ プログラム引数を処理する際はこの関数から生成されるインスタンスを使用すること。
+
+ \return プログラム引数のdescription
+ */
 po::options_description MakeOptionsDescription() {
   po::options_description description;
   description.add(::MakeFilenameDescription()).add(::MakeOtherDescription());
   return description;
 }
+/*!
+ \brief ファイル名以外のプログラム引数のdescriptionを生成。
+
+ \return ファイル名以外のプログラム引数のdescription
+ */
 po::options_description MakeOtherDescription() {
   po::options_description description;
   description.add_options()
