@@ -133,34 +133,6 @@ using filename_vector_t = std::vector<std::string>;
 }  // namespace
 
 namespace {
-
-inline po::options_description MakeOtherDescription() {
-  po::options_description description;
-  description.add_options()
-    ("delta,d",
-     po::value<double>()->default_value(0.0),
-     "Specify value of delta")
-    ("help,h", "Show this");
-  return description;
-}
-
-inline po::options_description MakeFilenameDescription() {
-  po::options_description description;
-  description.add_options()
-    (::filename_option_name,
-     po::value< ::filename_vector_t>()->required(),
-     "finename option implication");
-  return description;
-}
-
-inline po::options_description MakeOptionsDescription() {
-  po::options_description description;
-  description.add(::MakeFilenameDescription()).add(::MakeOtherDescription());
-  return description;
-}
-}  // namespace
-
-namespace {
 bool CheckKernelLine(const std::string& line);
 cv::Mat Conbime(Mat output, const cv::Mat& left, const cv::Mat& right);
 cv::Mat Filter(const cv::Mat& src, const cv::Mat& kernel, double delta);
@@ -175,7 +147,10 @@ boost::optional<boost::program_options::variables_map>
 GetVariablesMap(int argc, char** argv);
 cv::Mat HandleEmpty(cv::Mat m, const char* const error_message);
 int Help();
+boost::program_options::options_description MakeFilenameDescription();
 cv::Mat MakeKernel(int size);
+boost::program_options::options_description MakeOptionsDescription();
+boost::program_options::options_description MakeOtherDescription();
 cv::Mat MakeOutputImage(const cv::Mat& src);
 void ExitFailure(const char* const error_message);
 std::ifstream& Rewind(std::ifstream& stream);
@@ -320,9 +295,31 @@ int Help() {
   cout << MakeOtherDescription() << endl;
   return EXIT_SUCCESS;
 }
+po::options_description MakeFilenameDescription() {
+  po::options_description description;
+  description.add_options()
+    (::filename_option_name,
+     po::value< ::filename_vector_t>()->required(),
+     "finename option implication");
+  return description;
+}
 Mat MakeKernel(int size) {
   return (size == 0)?
     Mat():Mat::zeros(size, size, cv::DataType<double>::type);
+}
+po::options_description MakeOptionsDescription() {
+  po::options_description description;
+  description.add(::MakeFilenameDescription()).add(::MakeOtherDescription());
+  return description;
+}
+po::options_description MakeOtherDescription() {
+  po::options_description description;
+  description.add_options()
+    ("delta,d",
+     po::value<double>()->default_value(0.0),
+     "Specify value of delta")
+    ("help,h", "Show this");
+  return description;
 }
 /*!
  \brief 出力先の画像を生成。
