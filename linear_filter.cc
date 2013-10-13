@@ -85,7 +85,7 @@ Mat Filter(const Mat& src, const Mat& kernel) {
  プログラム引数が2つの時(画像ファイル名が指定されていない)はデフォルトの値
  'input.jpg'を、それ以上の場合は第二引数をファイル名として返す。
  
- \param agrc argc
+ \param argc argc
  \param argv argv
  \return 画像のファイル名
 */
@@ -173,7 +173,7 @@ Mat SetOperators(Mat kernel, ifstream& stream, int size) {
 
  ウィンドウが閉じられた時、標準エラー出力にもエラーメッセージを出力する。
 
- \TODO もっといいエラーの表示方法はないものか...
+ \todo もっといいエラーの表示方法はないものか...
 
  \param error_message エラーメッセージ
  \return 常ににEXIT_FAILURE
