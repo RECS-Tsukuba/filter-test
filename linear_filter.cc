@@ -184,7 +184,7 @@ int GetExitCode(cv::Mat m) noexcept
  プログラム引数が2つの時(画像ファイル名が指定されていない)はデフォルトの値
  'input.jpg'を、それ以上の場合は第二引数をファイル名として返す。
  
- \param agrc argc
+ \param argc argc
  \param argv argv
  \return 画像のファイル名
 */
